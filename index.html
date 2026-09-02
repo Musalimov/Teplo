@@ -69,6 +69,8 @@
   dialog p{margin:0 0 10px;color:#c3d8de}
   dialog button{background:var(--gold);color:#0d2530;border:0;border-radius:8px;padding:9px 16px;
     font-size:15px;cursor:pointer;font-family:inherit;margin-top:6px}
+  dialog button.ghost{background:none;color:var(--muted);border:1px solid var(--line)}
+  .dlg-row{display:flex;gap:10px;align-items:center}
   @media (prefers-reduced-motion:no-preference){
     .row.new{animation:land .45s ease-out}
     @keyframes land{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
@@ -85,9 +87,9 @@ const CUSTOM = {
   title:      "Тепло",
 
   // Имя для приветствия. Само приветствие подставится по времени суток
-  // и на языке игры: «Доброе утро, Бася» / «Good evening, Basia».
+  // и на языке игры: «Доброе утро, Бася» / «Good evening, Basya».
   // Оставьте пустым, чтобы здороваться без имени.
-  name:       { ru: "Бася", en: "Basia" },
+  name:       { ru: "Бася", en: "Basya" },
 
   // Что показать при отгадке — своё для каждого языка.
   winMessage: { ru: "Победа!", en: "Победа!" },
@@ -120,6 +122,15 @@ const CUSTOM = {
   <div id="app" class="loading">Загружаю словарь…</div>
 </div>
 
+<dialog id="reset">
+  <h3 id="resetTitle"></h3>
+  <p id="resetBody"></p>
+  <div class="dlg-row">
+    <button id="resetGo"></button>
+    <button id="resetNo" class="ghost"></button>
+  </div>
+</dialog>
+
 <dialog id="help">
   <h3 id="helpTitle">Как играть</h3>
   <div id="helpBody"></div>
@@ -139,6 +150,9 @@ const T = {
     hello:{morning:"Доброе утро", day:"Добрый день", evening:"Добрый вечер", night:"Доброй ночи"},
     winSub:(n,h)=>`${n} ${plural(n,"попытка","попытки","попыток")}${h?`, подсказок: ${h}`:""}`,
     hint:"Подсказка", giveup:"Сдаться", help:"Правила", stats:n=>`сыграно: ${n}`,
+    reset:"Сброс", resetTitle:"Начать заново?",
+    resetBody:"Счётчик отгаданных обнулится, все попытки во всех загадках забудутся. Сами загадки останутся прежними.",
+    resetGo:"Стереть", resetNo:"Отмена",
     gaveup:w=>`Загаданное слово — ${w}`, nextIn:t=>`новое слово через ${t}`,
     loadDict:"Разворачиваю русский словарь",
     rules:n=>`<p>Нужно угадать одно спрятанное слово. Все слова словаря выстроены в список по смысловой близости к загаданному, и каждая попытка получает своё место в этом списке.</p>
@@ -151,6 +165,9 @@ const T = {
     hello:{morning:"Good morning", day:"Good afternoon", evening:"Good evening", night:"Good night"},
     winSub:(n,h)=>`${n} ${n===1?"guess":"guesses"}${h?`, ${h} hint${h>1?"s":""}`:""}`,
     hint:"Hint", giveup:"Give up", help:"Rules", stats:n=>`solved: ${n}`,
+    reset:"Reset", resetTitle:"Start over?",
+    resetBody:"The solved counter goes back to zero and every guess in every puzzle is forgotten. The puzzles themselves stay the same.",
+    resetGo:"Erase", resetNo:"Cancel",
     gaveup:w=>`The word was ${w}`, nextIn:t=>`next word in ${t}`,
     loadDict:"Unpacking the English dictionary",
     rules:n=>`<p>Find the hidden word. Every word in the dictionary is ranked by how close it is in meaning to the answer, and each guess gets its place in that ranking.</p>
@@ -279,6 +296,18 @@ function ensurePuzzle(){
   else state = Object.assign(store.get(state.key)||state,{key:state.key});
 }
 function save(){ const {key,...s}=state; store.set(key,s) }
+// стираем только своё: попытки по дням и списки отгаданного
+function wipe(){
+  const mine = k => /^(t_|solved_)/.test(k);
+  try{
+    const keys = [];
+    for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(mine(k)) keys.push(k) }
+    keys.forEach(k=>localStorage.removeItem(k));
+  }catch(e){}
+  for(const k of Object.keys(mem)) if(mine(k)) delete mem[k];
+  cacheKey = null;
+  render();
+}
 function temp(r){ return r<=11?"var(--hot)":r<=101?"var(--warm)":r<=1001?"var(--cool)"
                        :r<=4001?"var(--ice)":"var(--muted)" }
 function pct(r){
@@ -313,6 +342,7 @@ function render(){
       </div>
       ${done?"":`<button id="hintBtn">${t.hint}</button><button id="giveBtn">${t.giveup}</button>`}
       <button id="helpBtn">${t.help}</button>
+      <button id="resetBtn">${t.reset}</button>
       <div class="spacer"></div><div class="stats">${t.stats(solved)}</div>
     </footer>`;
 
@@ -335,6 +365,16 @@ function render(){
     $("#helpBody").innerHTML = T[lang].rules(D[lang].words.length);
     $("#helpClose").textContent = lang==="ru"?"Понятно":"Got it";
     document.getElementById("help").showModal();
+  };
+  $("#resetBtn").onclick = ()=>{
+    $("#resetTitle").textContent = t.resetTitle;
+    $("#resetBody").textContent  = t.resetBody;
+    $("#resetGo").textContent    = t.resetGo;
+    $("#resetNo").textContent    = t.resetNo;
+    const dlg = document.getElementById("reset");
+    $("#resetGo").onclick = ()=>{ dlg.close(); wipe() };
+    $("#resetNo").onclick = ()=>dlg.close();
+    dlg.showModal();
   };
   $("#prev").onclick = ()=>{ offset--; render() };
   $("#next").onclick = ()=>{ if(offset<0){ offset++; render() } };
