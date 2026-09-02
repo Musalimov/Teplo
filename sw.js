@@ -1,5 +1,5 @@
 // Версию менять при каждом обновлении файлов игры — старый кэш тогда стирается.
-const CACHE = "teplo-3";
+const CACHE = "teplo-4";
 
 self.addEventListener("install", () => self.skipWaiting());
 

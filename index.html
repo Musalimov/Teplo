@@ -28,13 +28,31 @@
     border-radius:5px;cursor:pointer;line-height:1;padding:0;font-size:13px}
   .nav button:disabled{opacity:.3;cursor:default}
   .greeting{font:italic 400 19px/1.4 Georgia,serif;color:var(--gold);margin:0 0 16px;opacity:.9}
-  form{display:flex;gap:8px;margin:0 0 6px}
-  input[type=text]{flex:1;min-width:0;background:var(--deep-2);border:1px solid var(--line);
-    border-radius:10px;padding:14px 16px;color:var(--ink);font-size:17px;font-family:inherit}
-  input[type=text]::placeholder{color:#4d7280}
-  input[type=text]:focus{outline:2px solid var(--ice);outline-offset:1px;border-color:transparent}
-  form button{background:var(--gold);color:#0d2530;border:0;border-radius:10px;padding:0 20px;
-    font-size:16px;font-weight:600;cursor:pointer;font-family:inherit}
+  .inputrow{position:relative;display:flex;gap:8px;margin:0 0 6px}
+  form{flex:1;display:flex;margin:0;min-width:0}
+  .field{flex:1;display:flex;align-items:center;gap:10px;min-width:0;
+    background:var(--deep-2);border:1px solid var(--line);border-radius:10px;padding:0 14px}
+  .field:focus-within{border-color:transparent;outline:2px solid var(--ice);outline-offset:1px}
+  .field input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--ink);
+    font-size:17px;font-family:inherit;padding:14px 0}
+  .field input::placeholder{color:#4d7280}
+  .field .count{color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
+  .icon{width:18px;height:18px;flex:none;stroke:var(--muted);fill:none;
+    stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .dots{flex:none;width:52px;background:var(--deep-2);border:1px solid var(--line);
+    border-radius:10px;color:var(--muted);font-size:19px;line-height:1;cursor:pointer;
+    font-family:inherit;letter-spacing:1px}
+  .dots:hover{color:var(--ink)}
+  .menu{position:absolute;right:0;top:calc(100% + 8px);z-index:5;min-width:215px;
+    background:#173743;border:1px solid var(--line);border-radius:12px;padding:6px;
+    box-shadow:0 14px 34px rgba(0,0,0,.5)}
+  .menu[hidden]{display:none}
+  .menu button{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;
+    color:var(--ink);font-size:16px;font-family:inherit;padding:13px 12px;border-radius:8px;
+    cursor:pointer;text-align:left}
+  .menu button:hover{background:rgba(255,255,255,.07)}
+  .pinned{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .pinned .row{border-bottom:0;padding-top:4px;padding-bottom:4px}
   .note{min-height:22px;font-size:14px;color:var(--muted);margin-bottom:14px}
   .note.warn{color:#ffa98f}
   .rows{display:flex;flex-direction:column}
@@ -150,7 +168,7 @@ const T = {
     hello:{morning:"Доброе утро", day:"Добрый день", evening:"Добрый вечер", night:"Доброй ночи"},
     winSub:(n,h)=>`${n} ${plural(n,"попытка","попытки","попыток")}${h?`, подсказок: ${h}`:""}`,
     hint:"Подсказка", giveup:"Сдаться", help:"Правила", stats:n=>`сыграно: ${n}`,
-    reset:"Сброс", resetTitle:"Начать заново?",
+    reset:"Сброс", more:"Ещё", resetTitle:"Начать заново?",
     resetBody:"Счётчик отгаданных обнулится, все попытки во всех загадках забудутся. Сами загадки останутся прежними.",
     resetGo:"Стереть", resetNo:"Отмена",
     gaveup:w=>`Загаданное слово — ${w}`, nextIn:t=>`новое слово через ${t}`,
@@ -165,7 +183,7 @@ const T = {
     hello:{morning:"Good morning", day:"Good afternoon", evening:"Good evening", night:"Good night"},
     winSub:(n,h)=>`${n} ${n===1?"guess":"guesses"}${h?`, ${h} hint${h>1?"s":""}`:""}`,
     hint:"Hint", giveup:"Give up", help:"Rules", stats:n=>`solved: ${n}`,
-    reset:"Reset", resetTitle:"Start over?",
+    reset:"Reset", more:"More", resetTitle:"Start over?",
     resetBody:"The solved counter goes back to zero and every guess in every puzzle is forgotten. The puzzles themselves stay the same.",
     resetGo:"Erase", resetNo:"Cancel",
     gaveup:w=>`The word was ${w}`, nextIn:t=>`next word in ${t}`,
@@ -223,6 +241,10 @@ async function boot(){
   if(CUSTOM.title) $("#title").textContent = CUSTOM.title;
   document.title = (CUSTOM.title||"Тепло")+" — слово дня";
   lang = store.get("lang") || "ru";
+  if(document.addEventListener) document.addEventListener("click", ev=>{
+    const m = $("#menu");
+    if(m && !m.hidden && ev.target.closest && !ev.target.closest(".inputrow")) m.hidden = true;
+  });
   await loadLang(lang);
   render();
 }
@@ -323,24 +345,41 @@ function render(){
       {day:"numeric",month:"long"})}<br>${t.puzzle} №${puzzleNo()}`;
   $("#next").disabled = offset>=0;
   const done = state.won||state.gaveup;
-  const rows = state.guesses.map(g=>({...g,r:ranks[g.i]})).sort((a,b)=>a.r-b.r);
+  const all = state.guesses.map(g=>({...g,r:ranks[g.i]}));
+  const pinned = all.length ? all[all.length-1] : null;      // последняя попытка висит сверху
+  const rows = all.slice(0,-1).sort((a,b)=>a.r-b.r);         // и опускается сюда со следующим ходом
 
   $("#app").className = "";
   $("#app").innerHTML = `
     ${done?"":`<div class="greeting">${greeting()}</div>`}
     ${done?winBlock():`
-      <form id="f" autocomplete="off">
-        <input type="text" id="g" placeholder="${t.place}" spellcheck="false" enterkeyhint="send">
-        <button type="submit">${t.send}</button>
-      </form>`}
+      <div class="inputrow">
+        <form id="f" autocomplete="off">
+          <label class="field">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+            <input type="text" id="g" placeholder="${t.place}" spellcheck="false"
+                   enterkeyhint="go" autocapitalize="none" autocorrect="off">
+            <span class="count">#${state.guesses.length+1}</span>
+          </label>
+        </form>
+        <button type="button" class="dots" id="menuBtn" aria-label="${t.more}">•••</button>
+        <div class="menu" id="menu" hidden>
+          <button id="hintBtn">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.3.3.5.7.5 1.1v1h6v-1c0-.4.2-.8.5-1.1A6 6 0 0 0 12 3z"/></svg>
+            ${t.hint}</button>
+          <button id="giveBtn">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            ${t.giveup}</button>
+        </div>
+      </div>`}
     <div class="note" id="note"></div>
+    ${pinned ? `<div class="pinned">${rowHTML(pinned)}</div>` : ""}
     <div class="rows">${rows.map(rowHTML).join("")}</div>
     <footer>
       <div class="langs">
         <button data-l="ru" aria-pressed="${lang==="ru"}">Рус</button>
         <button data-l="en" aria-pressed="${lang==="en"}">Eng</button>
       </div>
-      ${done?"":`<button id="hintBtn">${t.hint}</button><button id="giveBtn">${t.giveup}</button>`}
       <button id="helpBtn">${t.help}</button>
       <button id="resetBtn">${t.reset}</button>
       <div class="spacer"></div><div class="stats">${t.stats(solved)}</div>
@@ -358,8 +397,11 @@ function render(){
       await loadLang(lang);
       render();
     });
-  if($("#hintBtn")) $("#hintBtn").onclick = hint;
-  if($("#giveBtn")) $("#giveBtn").onclick = ()=>{ state.gaveup=true; save(); render() };
+  const menu = $("#menu");
+  if($("#menuBtn")) $("#menuBtn").onclick = e=>{ e.stopPropagation(); menu.hidden = !menu.hidden };
+  if($("#hintBtn")) $("#hintBtn").onclick = ()=>{ menu.hidden = true; hint() };
+  if($("#giveBtn")) $("#giveBtn").onclick = ()=>{ menu.hidden = true;
+                                                  state.gaveup = true; save(); render() };
   $("#helpBtn").onclick = ()=>{
     $("#helpTitle").textContent = lang==="ru"?"Как играть":"How to play";
     $("#helpBody").innerHTML = T[lang].rules(D[lang].words.length);
