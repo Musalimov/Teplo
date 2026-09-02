@@ -196,6 +196,7 @@ const T = {
 };
 function plural(n,a,b,c){const m=n%100,k=n%10;return m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c}
 
+const BUILD = "11 · 3 сентября";
 const DAY = 86400000, EPOCH_Y = 2026, EPOCH_M = 0, EPOCH_D = 1;
 const dayStart = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 let D=null, lang="ru", offset=0, state=null, secret=0, sims=null, coreSorted=null,
@@ -402,7 +403,7 @@ function render(){
       </div>
       <button id="helpBtn">${t.help}</button>
       <button id="resetBtn">${t.reset}</button>
-      <div class="spacer"></div><div class="stats">${t.stats(solved)}</div>
+      <div class="spacer"></div><div class="stats">${t.stats(solved)} · сборка ${BUILD.split(" ")[0]}</div>
     </footer>`;
 
   const f=$("#f");
@@ -424,7 +425,8 @@ function render(){
                                                   state.gaveup = true; save(); render() };
   $("#helpBtn").onclick = ()=>{
     $("#helpTitle").textContent = lang==="ru"?"Как играть":"How to play";
-    $("#helpBody").innerHTML = T[lang].rules(D[lang].core, D[lang].words.length);
+    $("#helpBody").innerHTML = T[lang].rules(D[lang].core, D[lang].words.length)
+      + `<p style="opacity:.55;font-size:13px">сборка ${BUILD}</p>`;
     $("#helpClose").textContent = lang==="ru"?"Понятно":"Got it";
     const dlg = document.getElementById("help");
     $("#helpClose").onclick = ()=>dlg.close();
