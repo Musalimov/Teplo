@@ -162,9 +162,9 @@ const CUSTOM = {
 };
 
 const T = {
-  ru:{ place:"введите слово", send:"Сказать", puzzle:"загадка", tag:" · подсказка",
+  ru:{ place:"введите слово", puzzle:"загадка", tag:" · подсказка",
     notfound:w=>`«${w}» нет в словаре игры`, already:w=>`«${w}» уже было`,
-    empty:"Введите слово", cold:"холодно", win:"Угадано!",
+    empty:"Введите слово", win:"Угадано!",
     hello:{morning:"Доброе утро", day:"Добрый день", evening:"Добрый вечер", night:"Доброй ночи"},
     winSub:(n,h)=>`${n} ${plural(n,"попытка","попытки","попыток")}` +
       (h ? `, из них ${h*5} за ${h} ${plural(h,"подсказку","подсказки","подсказок")}` : ""),
@@ -178,9 +178,9 @@ const T = {
       <p><b>1</b> — само загаданное слово, вы угадали. <b>2</b> — его ближайший сосед по смыслу. <b>8</b> — совсем рядом. <b>350</b> — тёплое направление. <b>${Math.round(n*0.8/1000)*1000}</b> — почти край словаря, дальше некуда. Всего слов ${n.toLocaleString("ru-RU")}.</p>
       <p>Близость смысловая, а не буквенная: к слову «зима» близки «мороз» и «декабрь», но не «зимбабве».</p>
       <p>Слово можно вводить в любой форме — игра сама приведёт его к начальной. Новая загадка каждый день.</p>` },
-  en:{ place:"type a word", send:"Guess", puzzle:"puzzle", tag:" · hint",
+  en:{ place:"type a word", puzzle:"puzzle", tag:" · hint",
     notfound:w=>`“${w}” is not in the game dictionary`, already:w=>`“${w}” already guessed`,
-    empty:"Type a word", cold:"cold", win:"Got it!",
+    empty:"Type a word", win:"Got it!",
     hello:{morning:"Good morning", day:"Good afternoon", evening:"Good evening", night:"Good night"},
     winSub:(n,h)=>`${n} ${n===1?"guess":"guesses"}` +
       (h ? `, ${h*5} of them for ${h} hint${h>1?"s":""}` : ""),
@@ -243,6 +243,10 @@ async function boot(){
   if(CUSTOM.title) $("#title").textContent = CUSTOM.title;
   document.title = (CUSTOM.title||"Тепло")+" — слово дня";
   lang = store.get("lang") || "ru";
+  for(const id of ["help","reset"]){
+    const d = document.getElementById(id);
+    if(d) d.onclick = ev=>{ if(ev.target === d) d.close() };
+  }
   if(document.addEventListener) document.addEventListener("click", ev=>{
     const m = $("#menu");
     if(m && !m.hidden && ev.target.closest && !ev.target.closest(".inputrow")) m.hidden = true;
@@ -255,6 +259,8 @@ async function boot(){
 async function loadLang(L){
   const d = D[L];
   if(d.vec) return;
+  if(d.loading) return d.loading;          // уже грузится — ждём ту же загрузку
+  return d.loading = (async ()=>{
   const raw = await unpack(FILES[L], T[L].loadDict);
   const n = d.words.length, dims = D.dims;
   d.vec = new Int8Array(raw.buffer, 0, n*dims);
@@ -270,6 +276,7 @@ async function loadLang(L){
   }
   if(bad.length) console.warn("Этих слов нет в словаре игры, они пропущены: "+bad.join(", "));
   cacheKey = null;
+  })();
 }
 
 // словоформы лежат одной отсортированной строкой; ищем делением пополам
@@ -348,6 +355,7 @@ function render(){
   $("#meta").innerHTML = `${dt.toLocaleDateString(lang==="ru"?"ru-RU":"en-GB",
       {day:"numeric",month:"long"})}<br>${t.puzzle} №${puzzleNo()}`;
   $("#next").disabled = offset>=0;
+  $("#prev").disabled = puzzleNo()<=0;
   const done = state.won||state.gaveup;
   const all = state.guesses.map(g=>({...g,r:ranks[g.i]}));
   const pinned = all.length ? all[all.length-1] : null;      // последняя попытка висит сверху
@@ -410,7 +418,9 @@ function render(){
     $("#helpTitle").textContent = lang==="ru"?"Как играть":"How to play";
     $("#helpBody").innerHTML = T[lang].rules(D[lang].words.length);
     $("#helpClose").textContent = lang==="ru"?"Понятно":"Got it";
-    document.getElementById("help").showModal();
+    const dlg = document.getElementById("help");
+    $("#helpClose").onclick = ()=>dlg.close();
+    dlg.showModal();
   };
   $("#resetBtn").onclick = ()=>{
     $("#resetTitle").textContent = t.resetTitle;
@@ -422,7 +432,7 @@ function render(){
     $("#resetNo").onclick = ()=>dlg.close();
     dlg.showModal();
   };
-  $("#prev").onclick = ()=>{ offset--; render() };
+  $("#prev").onclick = ()=>{ if(puzzleNo()>0){ offset--; render() } };
   $("#next").onclick = ()=>{ if(offset<0){ offset++; render() } };
 }
 
