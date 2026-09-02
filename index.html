@@ -174,8 +174,8 @@ const T = {
     resetGo:"Стереть", resetNo:"Отмена",
     gaveup:w=>`Загаданное слово — ${w}`, nextIn:t=>`новое слово через ${t}`,
     loadDict:"Разворачиваю русский словарь",
-    rules:n=>`<p>Нужно угадать одно спрятанное слово. Все слова словаря выстроены в список по смысловой близости к загаданному, и каждая попытка получает своё место в этом списке.</p>
-      <p><b>1</b> — само загаданное слово, вы угадали. <b>2</b> — его ближайший сосед по смыслу. <b>8</b> — совсем рядом. <b>350</b> — тёплое направление. <b>${Math.round(n*0.8/1000)*1000}</b> — почти край словаря, дальше некуда. Всего слов ${n.toLocaleString("ru-RU")}.</p>
+    rules:(n,m)=>`<p>Нужно угадать одно спрятанное слово. Все слова словаря выстроены в список по смысловой близости к загаданному, и каждая попытка получает своё место в этом списке.</p>
+      <p><b>1</b> — само загаданное слово, вы угадали. <b>2</b> — его ближайший сосед по смыслу. <b>8</b> — совсем рядом. <b>350</b> — тёплое направление. <b>${Math.round(n*0.8/1000)*1000}</b> — почти край, дальше некуда. Номера считаются по ${n.toLocaleString("ru-RU")} ходовым словам, а принимается любое из ${m.toLocaleString("ru-RU")}.</p>
       <p>Близость смысловая, а не буквенная: к слову «зима» близки «мороз» и «декабрь», но не «зимбабве».</p>
       <p>Слово можно вводить в любой форме — игра сама приведёт его к начальной. Новая загадка каждый день.</p>` },
   en:{ place:"type a word", puzzle:"puzzle", tag:" · hint",
@@ -190,14 +190,14 @@ const T = {
     resetGo:"Erase", resetNo:"Cancel",
     gaveup:w=>`The word was ${w}`, nextIn:t=>`next word in ${t}`,
     loadDict:"Unpacking the English dictionary",
-    rules:n=>`<p>Find the hidden word. Every word in the dictionary is ranked by how close it is in meaning to the answer, and each guess gets its place in that ranking.</p>
-      <p><b>1</b> is the hidden word itself — you win. <b>2</b> is its nearest neighbour in meaning. <b>8</b> is very close. <b>350</b> is a warm direction. <b>${Math.round(n*0.8/1000)*1000}</b> is nearly the far edge. The dictionary holds ${n.toLocaleString("en-GB")} words.</p>
+    rules:(n,m)=>`<p>Find the hidden word. Every word in the dictionary is ranked by how close it is in meaning to the answer, and each guess gets its place in that ranking.</p>
+      <p><b>1</b> is the hidden word itself — you win. <b>2</b> is its nearest neighbour in meaning. <b>8</b> is very close. <b>350</b> is a warm direction. <b>${Math.round(n*0.8/1000)*1000}</b> is nearly the far edge. Ranks are counted over ${n.toLocaleString("en-GB")} everyday words; any of ${m.toLocaleString("en-GB")} is accepted.</p>
       <p>A new word every day.</p>` }
 };
 function plural(n,a,b,c){const m=n%100,k=n%10;return m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c}
 
 const DAY = 86400000, EPOCH = new Date(2026,0,1).setHours(0,0,0,0);
-let D=null, lang="ru", offset=0, state=null, secret=0, ranks=null, sims=null,
+let D=null, lang="ru", offset=0, state=null, secret=0, sims=null, coreSorted=null,
     refocus=false, cacheKey=null;
 
 const $ = s=>document.querySelector(s);
@@ -237,9 +237,8 @@ const breathe = m => new Promise(r=>{ const a=$("#app"); a.className="loading"; 
 async function boot(){
   const txt = JSON.parse(new TextDecoder().decode(await unpack(FILES.slova,"Читаю слова")));
   D = { dims:txt.dims,
-    ru:{ words:txt.ru.w, forms:txt.ru.f, targets:txt.ru.t.slice(), vec:null, index:null },
-    en:{ words:txt.en.w, forms:null, targets:txt.en.t.slice(), vec:null,
-         index:new Map(txt.en.w.map((w,i)=>[w,i])) } };
+    ru:{ words:txt.ru.w, forms:txt.ru.f, targets:txt.ru.t.slice(), core:txt.ru.core, vec:null },
+    en:{ words:txt.en.w, forms:txt.en.f, targets:txt.en.t.slice(), core:txt.en.core, vec:null } };
   if(CUSTOM.title) $("#title").textContent = CUSTOM.title;
   document.title = (CUSTOM.title||"Тепло")+" — слово дня";
   lang = store.get("lang") || "ru";
@@ -280,8 +279,7 @@ async function loadLang(L){
 }
 
 // словоформы лежат одной отсортированной строкой; ищем делением пополам
-function findForm(s){
-  const F = D.ru.forms;
+function findForm(F, s){
   let lo = 0, hi = F.length;
   while(lo < hi){
     const mid = (lo+hi)>>1;
@@ -297,8 +295,7 @@ function findForm(s){
 function lookup(L,w){
   w = String(w).trim().toLowerCase().replace(/ё/g,"е").replace(/[^a-zа-я\-]/g,"");
   if(!w) return -1;
-  if(L==="en"){ const i=D.en.index.get(w); return i===undefined?-1:i }
-  return findForm(w);
+  return findForm(D[L].forms, w);
 }
 function todayIndex(){ return Math.round((new Date().setHours(0,0,0,0)-EPOCH)/DAY) }
 function dateOf(no){ return new Date(EPOCH + no*DAY) }
@@ -314,9 +311,8 @@ function loadPuzzle(){
     for(let j=0;j<dims;j++) s += d.vec[o+j]*d.vec[so+j];
     sims[i] = s/(d.norms[i]*sn);
   }
-  const order = Array.from(sims.keys()).sort((a,b)=>sims[b]-sims[a]);
-  ranks = new Int32Array(m);
-  order.forEach((wi,r)=>ranks[wi]=r+1);          // 1 — само загаданное слово
+  // ранг считаем только по ядру — ходовым словам; редкий хвост номера не раздувает
+  coreSorted = Float32Array.from(sims.subarray(0, d.core)).sort();
   const key = `t_${lang}_${no}`;
   state = store.get(key) || {guesses:[],hints:0,won:false,gaveup:false};
   state.key = key;
@@ -327,6 +323,12 @@ function ensurePuzzle(){
   else state = Object.assign(store.get(state.key)||state,{key:state.key});
 }
 function save(){ const {key,...s}=state; store.set(key,s) }
+function rank(i){
+  const v = sims[i], n = coreSorted.length;
+  let lo = 0, hi = n;
+  while(lo < hi){ const mid = (lo+hi)>>1; if(coreSorted[mid] > v) hi = mid; else lo = mid+1 }
+  return n - lo + 1;
+}
 // подсказка стоит пять ходов, сама подсказанная строка входит в эти пять
 function score(){ return state.guesses.filter(g=>!g.hint).length + 5*state.hints }
 // стираем только своё: попытки по дням и списки отгаданного
@@ -344,7 +346,7 @@ function wipe(){
 function temp(r){ return r<=11?"var(--hot)":r<=101?"var(--warm)":r<=1001?"var(--cool)"
                        :r<=4001?"var(--ice)":"var(--muted)" }
 function pct(r){
-  return Math.max(1, Math.round(100*(1 - Math.log(r)/Math.log(D[lang].words.length))));
+  return Math.max(1, Math.round(100*(1 - Math.log(r)/Math.log(D[lang].core))));
 }
 
 function render(){
@@ -357,7 +359,7 @@ function render(){
   $("#next").disabled = offset>=0;
   $("#prev").disabled = puzzleNo()<=0;
   const done = state.won||state.gaveup;
-  const all = state.guesses.map(g=>({...g,r:ranks[g.i]}));
+  const all = state.guesses.map(g=>({...g,r:rank(g.i)}));
   const pinned = all.length ? all[all.length-1] : null;      // последняя попытка висит сверху
   const rows = all.slice(0,-1).sort((a,b)=>a.r-b.r);         // и опускается сюда со следующим ходом
 
@@ -416,7 +418,7 @@ function render(){
                                                   state.gaveup = true; save(); render() };
   $("#helpBtn").onclick = ()=>{
     $("#helpTitle").textContent = lang==="ru"?"Как играть":"How to play";
-    $("#helpBody").innerHTML = T[lang].rules(D[lang].words.length);
+    $("#helpBody").innerHTML = T[lang].rules(D[lang].core, D[lang].words.length);
     $("#helpClose").textContent = lang==="ru"?"Понятно":"Got it";
     const dlg = document.getElementById("help");
     $("#helpClose").onclick = ()=>dlg.close();
@@ -477,15 +479,15 @@ function guess(raw, isHint){
 }
 
 function hint(){
-  const best = state.guesses.length ? Math.min(...state.guesses.map(g=>ranks[g.i])) : 900;
+  const best = state.guesses.length ? Math.min(...state.guesses.map(g=>rank(g.i))) : 900;
   const aim = Math.max(3, Math.floor(best/3));
   const d = D[lang], taken = new Set(state.guesses.map(g=>g.i));
   let pick=-1;
-  for(const limit of [2500, 8000, d.words.length]){   // подсказываем знакомыми словами
+  for(const limit of [2500, 8000, d.core]){          // подсказываем знакомыми словами
     let bestDiff=1e9;
     for(let i=0;i<limit;i++){
       if(i===secret||taken.has(i)) continue;
-      const diff=Math.abs(ranks[i]-aim);
+      const diff=Math.abs(rank(i)-aim);
       if(diff<bestDiff){ bestDiff=diff; pick=i }
     }
     if(pick>=0 && bestDiff < aim*0.6+40) break;
