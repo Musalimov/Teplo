@@ -166,8 +166,9 @@ const T = {
     notfound:w=>`«${w}» нет в словаре игры`, already:w=>`«${w}» уже было`,
     empty:"Введите слово", cold:"холодно", win:"Угадано!",
     hello:{morning:"Доброе утро", day:"Добрый день", evening:"Добрый вечер", night:"Доброй ночи"},
-    winSub:(n,h)=>`${n} ${plural(n,"попытка","попытки","попыток")}${h?`, подсказок: ${h}`:""}`,
-    hint:"Подсказка", giveup:"Сдаться", help:"Правила", stats:n=>`сыграно: ${n}`,
+    winSub:(n,h)=>`${n} ${plural(n,"попытка","попытки","попыток")}` +
+      (h ? `, из них ${h*5} за ${h} ${plural(h,"подсказку","подсказки","подсказок")}` : ""),
+    hint:"Подсказка (+5)", giveup:"Сдаться", help:"Правила", stats:n=>`сыграно: ${n}`,
     reset:"Сброс", more:"Ещё", resetTitle:"Начать заново?",
     resetBody:"Счётчик отгаданных обнулится, все попытки во всех загадках забудутся. Сами загадки останутся прежними.",
     resetGo:"Стереть", resetNo:"Отмена",
@@ -181,8 +182,9 @@ const T = {
     notfound:w=>`“${w}” is not in the game dictionary`, already:w=>`“${w}” already guessed`,
     empty:"Type a word", cold:"cold", win:"Got it!",
     hello:{morning:"Good morning", day:"Good afternoon", evening:"Good evening", night:"Good night"},
-    winSub:(n,h)=>`${n} ${n===1?"guess":"guesses"}${h?`, ${h} hint${h>1?"s":""}`:""}`,
-    hint:"Hint", giveup:"Give up", help:"Rules", stats:n=>`solved: ${n}`,
+    winSub:(n,h)=>`${n} ${n===1?"guess":"guesses"}` +
+      (h ? `, ${h*5} of them for ${h} hint${h>1?"s":""}` : ""),
+    hint:"Hint (+5 guesses)", giveup:"Give up", help:"Rules", stats:n=>`solved: ${n}`,
     reset:"Reset", more:"More", resetTitle:"Start over?",
     resetBody:"The solved counter goes back to zero and every guess in every puzzle is forgotten. The puzzles themselves stay the same.",
     resetGo:"Erase", resetNo:"Cancel",
@@ -318,6 +320,8 @@ function ensurePuzzle(){
   else state = Object.assign(store.get(state.key)||state,{key:state.key});
 }
 function save(){ const {key,...s}=state; store.set(key,s) }
+// подсказка стоит пять ходов, сама подсказанная строка входит в эти пять
+function score(){ return state.guesses.filter(g=>!g.hint).length + 5*state.hints }
 // стираем только своё: попытки по дням и списки отгаданного
 function wipe(){
   const mine = k => /^(t_|solved_)/.test(k);
@@ -359,7 +363,7 @@ function render(){
             <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
             <input type="text" id="g" placeholder="${t.place}" spellcheck="false"
                    enterkeyhint="go" autocapitalize="none" autocorrect="off">
-            <span class="count">#${state.guesses.length+1}</span>
+            <span class="count">#${score()+1}</span>
           </label>
         </form>
         <button type="button" class="dots" id="menuBtn" aria-label="${t.more}">•••</button>
@@ -438,7 +442,7 @@ function winBlock(){
   const left=`${Math.floor(ms/3600000)} ч ${Math.floor(ms%3600000/60000)} мин`;
   return `<div class="win">
     <h2>${state.won?t.win:t.gaveup(word)}</h2>
-    <p>${state.won?t.winSub(state.guesses.filter(g=>!g.hint).length,state.hints):""}${
+    <p>${state.won?t.winSub(score(),state.hints):""}${
       offset===0?" · "+t.nextIn(left):""}</p>
     ${state.won&&loc(CUSTOM.winMessage)?`<div class="personal">${loc(CUSTOM.winMessage)}</div>`:""}
   </div>`;
