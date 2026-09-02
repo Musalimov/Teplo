@@ -196,9 +196,10 @@ const T = {
 };
 function plural(n,a,b,c){const m=n%100,k=n%10;return m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c}
 
-const DAY = 86400000, EPOCH = new Date(2026,0,1).setHours(0,0,0,0);
+const DAY = 86400000, EPOCH_Y = 2026, EPOCH_M = 0, EPOCH_D = 1;
+const dayStart = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 let D=null, lang="ru", offset=0, state=null, secret=0, sims=null, coreSorted=null,
-    refocus=false, cacheKey=null;
+    refocus=false, cacheKey=null, tick=0;
 
 const $ = s=>document.querySelector(s);
 // значение может быть строкой или парой {ru,en}
@@ -297,8 +298,8 @@ function lookup(L,w){
   if(!w) return -1;
   return findForm(D[L].forms, w);
 }
-function todayIndex(){ return Math.round((new Date().setHours(0,0,0,0)-EPOCH)/DAY) }
-function dateOf(no){ return new Date(EPOCH + no*DAY) }
+function todayIndex(){ return Math.round((dayStart(new Date()) - new Date(EPOCH_Y,EPOCH_M,EPOCH_D).getTime())/DAY) }
+function dateOf(no){ return new Date(EPOCH_Y, EPOCH_M, EPOCH_D + no) }
 function puzzleNo(){ return todayIndex()+offset }
 
 function loadPuzzle(){
@@ -331,6 +332,11 @@ function rank(i){
 }
 // подсказка стоит пять ходов, сама подсказанная строка входит в эти пять
 function score(){ return state.guesses.filter(g=>!g.hint).length + 5*state.hints }
+function timeLeft(){
+  const d = new Date();
+  const ms = new Date(d.getFullYear(), d.getMonth(), d.getDate()+1).getTime() - Date.now();
+  return `${Math.floor(ms/3600000)} ч ${Math.floor(ms%3600000/60000)} мин`;
+}
 // стираем только своё: попытки по дням и списки отгаданного
 function wipe(){
   const mine = k => /^(t_|solved_)/.test(k);
@@ -435,6 +441,11 @@ function render(){
     dlg.showModal();
   };
   $("#prev").onclick = ()=>{ if(puzzleNo()>0){ offset--; render() } };
+  clearInterval(tick);
+  if(done && offset===0) tick = setInterval(()=>{
+    const el = $("#left");
+    if(el) el.textContent = T[lang].nextIn(timeLeft()); else clearInterval(tick);
+  }, 30000);
   $("#next").onclick = ()=>{ if(offset<0){ offset++; render() } };
 }
 
@@ -450,8 +461,7 @@ function rowHTML(g){
 
 function winBlock(){
   const t=T[lang], word=D[lang].words[secret];
-  const ms=(todayIndex()+1)*DAY+EPOCH-Date.now();
-  const left=`${Math.floor(ms/3600000)} ч ${Math.floor(ms%3600000/60000)} мин`;
+  const left = timeLeft();
   return `<div class="win">
     <h2>${state.won?t.win:t.gaveup(word)}</h2>
     <p>${state.won?t.winSub(score(),state.hints):""}${
@@ -480,7 +490,7 @@ function guess(raw, isHint){
 
 function hint(){
   const best = state.guesses.length ? Math.min(...state.guesses.map(g=>rank(g.i))) : 900;
-  const aim = Math.max(3, Math.floor(best/3));
+  const aim = Math.max(10, Math.floor(best/2));   // не ближе десятого места
   const d = D[lang], taken = new Set(state.guesses.map(g=>g.i));
   let pick=-1;
   for(const limit of [2500, 8000, d.core]){          // подсказываем знакомыми словами
