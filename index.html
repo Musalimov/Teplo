@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Тепло — слово дня</title>
+<style>
+  :root{
+    --deep:#0d2530; --deep-2:#12303c; --line:#1e4453;
+    --ink:#e8f1f3; --muted:#7fa0ab;
+    --ice:#6cc5dd; --cool:#5fbfa0; --warm:#e8b143; --hot:#ff6f4d; --gold:#f5d99b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(120% 80% at 50% -10%,#17414f 0%,transparent 60%),var(--deep);
+    color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    min-height:100vh;padding:24px 18px 60px;-webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:560px;margin:0 auto}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:26px}
+  h1{font:italic 400 30px/1 Georgia,"Times New Roman",serif;margin:0;color:var(--gold)}
+  .scale{display:flex;height:3px;border-radius:2px;overflow:hidden;margin:6px 0 0}
+  .scale i{flex:1}
+  .meta{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums;text-align:right}
+  .nav{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
+  .nav button{background:none;border:1px solid var(--line);color:var(--muted);width:24px;height:24px;
+    border-radius:5px;cursor:pointer;line-height:1;padding:0;font-size:13px}
+  .nav button:disabled{opacity:.3;cursor:default}
+  .greeting{font:italic 400 19px/1.4 Georgia,serif;color:var(--gold);margin:0 0 16px;opacity:.9}
+  form{display:flex;gap:8px;margin:0 0 6px}
+  input[type=text]{flex:1;min-width:0;background:var(--deep-2);border:1px solid var(--line);
+    border-radius:10px;padding:14px 16px;color:var(--ink);font-size:17px;font-family:inherit}
+  input[type=text]::placeholder{color:#4d7280}
+  input[type=text]:focus{outline:2px solid var(--ice);outline-offset:1px;border-color:transparent}
+  form button{background:var(--gold);color:#0d2530;border:0;border-radius:10px;padding:0 20px;
+    font-size:16px;font-weight:600;cursor:pointer;font-family:inherit}
+  .note{min-height:22px;font-size:14px;color:var(--muted);margin-bottom:14px}
+  .note.warn{color:#ffa98f}
+  .rows{display:flex;flex-direction:column}
+  .row{display:grid;grid-template-columns:58px 1fr auto;align-items:center;gap:12px;
+    padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.05)}
+  .row .rank{font-variant-numeric:tabular-nums;font-size:15px;text-align:right;color:var(--muted)}
+  .row .word{font-size:17px;position:relative;overflow:hidden}
+  .row .word span{position:relative;z-index:1}
+  .bar{position:absolute;left:-6px;top:-4px;bottom:-4px;border-radius:4px;opacity:.22;z-index:0}
+  .row .pct{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}
+  .row.new{background:rgba(245,217,155,.07);border-radius:6px}
+  .row.hint .word span::after{content:attr(data-tag);font-size:12px;color:var(--muted)}
+  .win{border:1px solid var(--gold);border-radius:12px;padding:18px;margin-bottom:18px;
+    background:linear-gradient(180deg,rgba(245,217,155,.12),transparent)}
+  .win h2{margin:0 0 6px;font:italic 400 26px/1.2 Georgia,serif;color:var(--gold)}
+  .win p{margin:0;color:var(--muted);font-size:14px}
+  .win .personal{color:var(--ink);font-size:16px;margin-top:10px;font-style:italic}
+  footer{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:22px}
+  footer button{background:none;border:1px solid var(--line);color:var(--muted);padding:7px 13px;
+    border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit}
+  .langs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:max-content}
+  .langs button{background:none;border:0;color:var(--muted);padding:5px 12px;font-size:13px;
+    cursor:pointer;font-family:inherit}
+  .langs button[aria-pressed="true"]{background:var(--line);color:var(--ink)}
+  .spacer{flex:1}
+  .stats{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .loading{color:var(--muted);font-size:15px;padding:40px 0;text-align:center;line-height:1.7}
+  dialog{background:var(--deep-2);color:var(--ink);border:1px solid var(--line);border-radius:14px;
+    padding:22px;max-width:420px;font-size:15px}
+  dialog::backdrop{background:rgba(5,20,26,.7)}
+  dialog h3{margin:0 0 10px;font:italic 400 22px/1.2 Georgia,serif;color:var(--gold)}
+  dialog p{margin:0 0 10px;color:#c3d8de}
+  dialog button{background:var(--gold);color:#0d2530;border:0;border-radius:8px;padding:9px 16px;
+    font-size:15px;cursor:pointer;font-family:inherit;margin-top:6px}
+  @media (prefers-reduced-motion:no-preference){
+    .row.new{animation:land .45s ease-out}
+    @keyframes land{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════
+     ЛИЧНЫЕ НАСТРОЙКИ — можно менять прямо здесь
+     ═══════════════════════════════════════════════════ -->
+<script>
+const CUSTOM = {
+  title:      "Тепло",
+  greeting:   "Доброе утро, Бася",
+  winMessage: "Победа!",
+
+  // Свои слова для загадывания — добавятся к встроенным.
+  // Подойдёт почти любое обычное слово, редкие могут не найтись в словаре.
+  extraRu:    [],           // например: ["варенье", "веснушка"]
+  extraEn:    []
+};
+</script>
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="title">Тепло</h1>
+      <div class="scale" aria-hidden="true">
+        <i style="background:var(--ice)"></i><i style="background:var(--cool)"></i>
+        <i style="background:var(--warm)"></i><i style="background:var(--hot)"></i>
+      </div>
+    </div>
+    <div>
+      <div class="meta" id="meta"></div>
+      <div class="nav">
+        <button id="prev" title="Предыдущий день">‹</button>
+        <button id="next" title="Следующий день">›</button>
+      </div>
+    </div>
+  </header>
+  <div id="app" class="loading">Загружаю словарь…</div>
+</div>
+
+<dialog id="help">
+  <h3 id="helpTitle">Как играть</h3>
+  <div id="helpBody"></div>
+  <button id="helpClose">Понятно</button>
+</dialog>
+
+<script>const FILES = {
+  slova: ["slova1.bin"],
+  ru:    ["ru1.bin","ru2.bin"],
+  en:    ["en1.bin","en2.bin","en3.bin"]
+};
+
+const T = {
+  ru:{ place:"введите слово", send:"Сказать", puzzle:"загадка", tag:" · подсказка",
+    notfound:w=>`«${w}» нет в словаре игры`, already:w=>`«${w}» уже было`,
+    empty:"Введите слово", cold:"холодно", win:"Угадано!",
+    winSub:(n,h)=>`${n} ${plural(n,"попытка","попытки","попыток")}${h?`, подсказок: ${h}`:""}`,
+    hint:"Подсказка", giveup:"Сдаться", help:"Правила", stats:n=>`сыграно: ${n}`,
+    gaveup:w=>`Загаданное слово — ${w}`, nextIn:t=>`новое слово через ${t}`,
+    loadDict:"Русский словарь, часть",
+    rules:`<p>Нужно угадать одно спрятанное слово. Все слова словаря выстроены в список по смысловой близости к загаданному, и каждая попытка получает своё место в этом списке.</p>
+      <p><b>1</b> — само загаданное слово, вы угадали. <b>2</b> — его ближайший сосед по смыслу. <b>8</b> — совсем рядом. <b>350</b> — тёплое направление. <b>9000</b> — почти край словаря, дальше некуда. Всего слов около двенадцати тысяч.</p>
+      <p>Близость смысловая, а не буквенная: к слову «зима» близки «мороз» и «декабрь», но не «зимбабве».</p>
+      <p>Слово можно вводить в любой форме — игра сама приведёт его к начальной. Новая загадка каждый день.</p>` },
+  en:{ place:"type a word", send:"Guess", puzzle:"puzzle", tag:" · hint",
+    notfound:w=>`“${w}” is not in the game dictionary`, already:w=>`“${w}” already guessed`,
+    empty:"Type a word", cold:"cold", win:"Got it!",
+    winSub:(n,h)=>`${n} ${n===1?"guess":"guesses"}${h?`, ${h} hint${h>1?"s":""}`:""}`,
+    hint:"Hint", giveup:"Give up", help:"Rules", stats:n=>`solved: ${n}`,
+    gaveup:w=>`The word was ${w}`, nextIn:t=>`next word in ${t}`,
+    loadDict:"English dictionary, part",
+    rules:`<p>Find the hidden word. Every word in the dictionary is ranked by how close it is in meaning to the answer, and each guess gets its place in that ranking.</p>
+      <p><b>1</b> is the hidden word itself — you win. <b>2</b> is its nearest neighbour in meaning. <b>8</b> is very close. <b>350</b> is a warm direction. <b>15000</b> is nearly the far edge of the dictionary.</p>
+      <p>A new word every day.</p>` }
+};
+function plural(n,a,b,c){const m=n%100,k=n%10;return m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c}
+
+const DAY = 86400000, EPOCH = new Date(2026,0,1).setHours(0,0,0,0);
+let D=null, lang="ru", offset=0, state=null, secret=0, ranks=null, sims=null,
+    refocus=false, cacheKey=null;
+
+const $ = s=>document.querySelector(s);
+const mem = {};
+const store = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k)) }catch(e){ return mem[k]??null } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)) }catch(e){ mem[k]=v } }
+};
+
+// данные лежат рядом отдельными файлами и склеиваются перед распаковкой
+async function unpack(parts, label){
+  const bufs = [];
+  for(let k=0;k<parts.length;k++){
+    await breathe(`${label} ${k+1} из ${parts.length}…`);
+    let r;
+    try{ r = await fetch(parts[k]) }
+    catch(e){ throw new Error("нет доступа к файлу "+parts[k]) }
+    if(!r.ok) throw new Error("не найден файл "+parts[k]+" ("+r.status+")");
+    bufs.push(new Uint8Array(await r.arrayBuffer()));
+  }
+  const all = new Uint8Array(bufs.reduce((a,b)=>a+b.length,0));
+  let o=0; for(const b of bufs){ all.set(b,o); o+=b.length }
+  const s = new Blob([all]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+
+const breathe = m => new Promise(r=>{ const a=$("#app"); a.className="loading"; a.textContent=m; setTimeout(r,16) });
+
+async function boot(){
+  const txt = JSON.parse(new TextDecoder().decode(await unpack(FILES.slova,"Читаю слова")));
+  D = { dims:txt.dims,
+    ru:{ words:txt.ru.w, forms:txt.ru.f, targets:txt.ru.t.slice(), vec:null, index:null },
+    en:{ words:txt.en.w, forms:null, targets:txt.en.t.slice(), vec:null,
+         index:new Map(txt.en.w.map((w,i)=>[w,i])) } };
+  if(CUSTOM.title) $("#title").textContent = CUSTOM.title;
+  document.title = (CUSTOM.title||"Тепло")+" — слово дня";
+  lang = store.get("lang") || "ru";
+  await loadLang(lang);
+  render();
+}
+
+// словарь каждого языка разворачивается только когда он понадобился
+async function loadLang(L){
+  const d = D[L];
+  if(d.vec) return;
+  const raw = await unpack(FILES[L], T[L].loadDict);
+  const n = d.words.length, dims = D.dims;
+  d.vec = new Int8Array(raw.buffer, 0, n*dims);
+  const norms = new Float32Array(n);
+  for(let i=0;i<n;i++){ let s=0; const o=i*dims;
+    for(let j=0;j<dims;j++){ const v=d.vec[o+j]; s+=v*v } norms[i]=Math.sqrt(s)||1 }
+  d.norms = norms;
+  const extra = (L==="ru"?CUSTOM.extraRu:CUSTOM.extraEn)||[], bad=[];
+  for(const w of extra){
+    if(lookup(L,w)<0){ bad.push(w); continue }
+    const lemma = d.words[lookup(L,w)];
+    if(!d.targets.includes(lemma)) d.targets.push(lemma);
+  }
+  if(bad.length) console.warn("Этих слов нет в словаре игры, они пропущены: "+bad.join(", "));
+  cacheKey = null;
+}
+
+// словоформы лежат одной отсортированной строкой; ищем делением пополам
+function findForm(s){
+  const F = D.ru.forms;
+  let lo = 0, hi = F.length;
+  while(lo < hi){
+    const mid = (lo+hi)>>1;
+    const start = mid===0 ? 0 : F.lastIndexOf("\n", mid-1)+1;
+    let end = F.indexOf("\n", start); if(end<0) end = F.length;
+    const tab = F.indexOf("\t", start);
+    const key = F.slice(start, tab);
+    if(key === s) return parseInt(F.slice(tab+1, end), 16);
+    if(key < s) lo = end+1; else hi = start;
+  }
+  return -1;
+}
+function lookup(L,w){
+  w = String(w).trim().toLowerCase().replace(/ё/g,"е").replace(/[^a-zа-я\-]/g,"");
+  if(!w) return -1;
+  if(L==="en"){ const i=D.en.index.get(w); return i===undefined?-1:i }
+  return findForm(w);
+}
+function todayIndex(){ return Math.round((new Date().setHours(0,0,0,0)-EPOCH)/DAY) }
+function dateOf(no){ return new Date(EPOCH + no*DAY) }
+function puzzleNo(){ return todayIndex()+offset }
+
+function loadPuzzle(){
+  const d = D[lang], dims = D.dims, n = d.targets.length, no = puzzleNo();
+  secret = lookup(lang, d.targets[((no%n)+n)%n]);
+  const m = d.words.length, sn = d.norms[secret], so = secret*dims;
+  sims = new Float32Array(m);
+  for(let i=0;i<m;i++){
+    let s=0; const o=i*dims;
+    for(let j=0;j<dims;j++) s += d.vec[o+j]*d.vec[so+j];
+    sims[i] = s/(d.norms[i]*sn);
+  }
+  const order = Array.from(sims.keys()).sort((a,b)=>sims[b]-sims[a]);
+  ranks = new Int32Array(m);
+  order.forEach((wi,r)=>ranks[wi]=r+1);          // 1 — само загаданное слово
+  const key = `t_${lang}_${no}`;
+  state = store.get(key) || {guesses:[],hints:0,won:false,gaveup:false};
+  state.key = key;
+  cacheKey = lang+"/"+no;
+}
+function ensurePuzzle(){
+  if(cacheKey !== lang+"/"+puzzleNo()) loadPuzzle();
+  else state = Object.assign(store.get(state.key)||state,{key:state.key});
+}
+function save(){ const {key,...s}=state; store.set(key,s) }
+function temp(r){ return r<=11?"var(--hot)":r<=101?"var(--warm)":r<=1001?"var(--cool)"
+                       :r<=4001?"var(--ice)":"var(--muted)" }
+function pct(r){
+  return Math.max(1, Math.round(100*(1 - Math.log(r)/Math.log(D[lang].words.length))));
+}
+
+function render(){
+  ensurePuzzle();
+  const t = T[lang];
+  const solved = (store.get("solved_"+lang)||[]).length;
+  const dt = dateOf(puzzleNo());
+  $("#meta").innerHTML = `${dt.toLocaleDateString(lang==="ru"?"ru-RU":"en-GB",
+      {day:"numeric",month:"long"})}<br>${t.puzzle} №${puzzleNo()}`;
+  $("#next").disabled = offset>=0;
+  const done = state.won||state.gaveup;
+  const rows = state.guesses.map(g=>({...g,r:ranks[g.i]})).sort((a,b)=>a.r-b.r);
+
+  $("#app").className = "";
+  $("#app").innerHTML = `
+    ${CUSTOM.greeting&&!done?`<div class="greeting">${CUSTOM.greeting}</div>`:""}
+    ${done?winBlock():`
+      <form id="f" autocomplete="off">
+        <input type="text" id="g" placeholder="${t.place}" spellcheck="false" enterkeyhint="send">
+        <button type="submit">${t.send}</button>
+      </form>`}
+    <div class="note" id="note"></div>
+    <div class="rows">${rows.map(rowHTML).join("")}</div>
+    <footer>
+      <div class="langs">
+        <button data-l="ru" aria-pressed="${lang==="ru"}">Рус</button>
+        <button data-l="en" aria-pressed="${lang==="en"}">Eng</button>
+      </div>
+      ${done?"":`<button id="hintBtn">${t.hint}</button><button id="giveBtn">${t.giveup}</button>`}
+      <button id="helpBtn">${t.help}</button>
+      <div class="spacer"></div><div class="stats">${t.stats(solved)}</div>
+    </footer>`;
+
+  const f=$("#f");
+  if(f){
+    f.onsubmit = e=>{ e.preventDefault(); const v=$("#g").value; $("#g").value=""; guess(v) };
+    if(refocus){ $("#g").focus(); refocus=false }
+  }
+  document.querySelectorAll(".langs button").forEach(b=>
+    b.onclick = async ()=>{
+      if(b.dataset.l===lang) return;
+      lang = b.dataset.l; store.set("lang",lang);
+      await loadLang(lang);
+      render();
+    });
+  if($("#hintBtn")) $("#hintBtn").onclick = hint;
+  if($("#giveBtn")) $("#giveBtn").onclick = ()=>{ state.gaveup=true; save(); render() };
+  $("#helpBtn").onclick = ()=>{
+    $("#helpTitle").textContent = lang==="ru"?"Как играть":"How to play";
+    $("#helpBody").innerHTML = T[lang].rules;
+    $("#helpClose").textContent = lang==="ru"?"Понятно":"Got it";
+    document.getElementById("help").showModal();
+  };
+  $("#prev").onclick = ()=>{ offset--; render() };
+  $("#next").onclick = ()=>{ if(offset<0){ offset++; render() } };
+}
+
+function rowHTML(g){
+  const t = T[lang];
+  return `<div class="row ${g.fresh?"new":""} ${g.hint?"hint":""}">
+    <div class="rank" style="color:${temp(g.r)}">${g.r}</div>
+    <div class="word"><div class="bar" style="width:calc(${pct(g.r)}% + 6px);background:${
+      temp(g.r)}"></div><span data-tag="${t.tag}">${D[lang].words[g.i]}</span></div>
+    <div class="pct">${Math.round(sims[g.i]*100)}</div>
+  </div>`;
+}
+
+function winBlock(){
+  const t=T[lang], word=D[lang].words[secret];
+  const ms=(todayIndex()+1)*DAY+EPOCH-Date.now();
+  const left=`${Math.floor(ms/3600000)} ч ${Math.floor(ms%3600000/60000)} мин`;
+  return `<div class="win">
+    <h2>${state.won?t.win:t.gaveup(word)}</h2>
+    <p>${state.won?t.winSub(state.guesses.filter(g=>!g.hint).length,state.hints):""}${
+      offset===0?" · "+t.nextIn(left):""}</p>
+    ${state.won&&CUSTOM.winMessage?`<div class="personal">${CUSTOM.winMessage}</div>`:""}
+  </div>`;
+}
+
+function guess(raw, isHint){
+  const t=T[lang], note=$("#note"), word=String(raw).trim();
+  if(!word){ note.textContent=t.empty; note.className="note warn"; return }
+  const i = lookup(lang, word);
+  if(i<0){ note.textContent=t.notfound(word); note.className="note warn"; return }
+  if(state.guesses.some(g=>g.i===i)){ note.textContent=t.already(D[lang].words[i]);
+                                      note.className="note warn"; return }
+  refocus = true;
+  state.guesses.forEach(g=>g.fresh=false);
+  state.guesses.push({i,fresh:true,hint:!!isHint});
+  if(i===secret){
+    state.won = true;
+    const k="solved_"+lang, s=store.get(k)||[];
+    if(!s.includes(puzzleNo())){ s.push(puzzleNo()); store.set(k,s) }
+  }
+  save(); render();
+}
+
+function hint(){
+  const best = state.guesses.length ? Math.min(...state.guesses.map(g=>ranks[g.i])) : 900;
+  const aim = Math.max(3, Math.floor(best/3));
+  const d = D[lang], taken = new Set(state.guesses.map(g=>g.i));
+  let pick=-1;
+  for(const limit of [2500, 8000, d.words.length]){   // подсказываем знакомыми словами
+    let bestDiff=1e9;
+    for(let i=0;i<limit;i++){
+      if(i===secret||taken.has(i)) continue;
+      const diff=Math.abs(ranks[i]-aim);
+      if(diff<bestDiff){ bestDiff=diff; pick=i }
+    }
+    if(pick>=0 && bestDiff < aim*0.6+40) break;
+  }
+  if(pick<0) return;
+  state.hints++;
+  guess(d.words[pick], true);
+}
+
+boot().catch(e=>{
+  const a=$("#app"); a.className="loading";
+  a.innerHTML = String(e).includes("доступа") || String(e).includes("найден")
+    ? `Не хватает файлов с данными.<br>Рядом с index.html должны лежать
+       slova1.bin, ru1.bin, ru2.bin, en1.bin, en2.bin, en3.bin.<br>
+       И открывать нужно по ссылке, а не из «Файлов».<br>
+       <small style="opacity:.6">${e}</small>`
+    : `Не удалось загрузить словарь.<br>
+       <small style="opacity:.6">${e}</small>`;
+});
+</script>
+<script>
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
