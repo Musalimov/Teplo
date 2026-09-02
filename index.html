@@ -83,8 +83,14 @@
 <script>
 const CUSTOM = {
   title:      "Тепло",
-  greeting:   "Доброе утро, Бася",
-  winMessage: "Победа!",
+
+  // Имя для приветствия. Само приветствие подставится по времени суток
+  // и на языке игры: «Доброе утро, Бася» / «Good evening, Basia».
+  // Оставьте пустым, чтобы здороваться без имени.
+  name:       { ru: "Бася", en: "Basia" },
+
+  // Что показать при отгадке — своё для каждого языка.
+  winMessage: { ru: "Победа!", en: "Победа!" },
 
   // Свои слова для загадывания — добавятся к встроенным.
   // Подойдёт почти любое обычное слово, редкие могут не найтись в словаре.
@@ -121,32 +127,34 @@ const CUSTOM = {
 </dialog>
 
 <script>const FILES = {
-  slova: ["slova1.bin"],
-  ru:    ["ru1.bin","ru2.bin"],
-  en:    ["en1.bin","en2.bin","en3.bin"]
+  slova: ["slova.bin"],
+  ru:    ["ru.bin"],
+  en:    ["en.bin"]
 };
 
 const T = {
   ru:{ place:"введите слово", send:"Сказать", puzzle:"загадка", tag:" · подсказка",
     notfound:w=>`«${w}» нет в словаре игры`, already:w=>`«${w}» уже было`,
     empty:"Введите слово", cold:"холодно", win:"Угадано!",
+    hello:{morning:"Доброе утро", day:"Добрый день", evening:"Добрый вечер", night:"Доброй ночи"},
     winSub:(n,h)=>`${n} ${plural(n,"попытка","попытки","попыток")}${h?`, подсказок: ${h}`:""}`,
     hint:"Подсказка", giveup:"Сдаться", help:"Правила", stats:n=>`сыграно: ${n}`,
     gaveup:w=>`Загаданное слово — ${w}`, nextIn:t=>`новое слово через ${t}`,
-    loadDict:"Русский словарь, часть",
-    rules:`<p>Нужно угадать одно спрятанное слово. Все слова словаря выстроены в список по смысловой близости к загаданному, и каждая попытка получает своё место в этом списке.</p>
-      <p><b>1</b> — само загаданное слово, вы угадали. <b>2</b> — его ближайший сосед по смыслу. <b>8</b> — совсем рядом. <b>350</b> — тёплое направление. <b>9000</b> — почти край словаря, дальше некуда. Всего слов около двенадцати тысяч.</p>
+    loadDict:"Разворачиваю русский словарь",
+    rules:n=>`<p>Нужно угадать одно спрятанное слово. Все слова словаря выстроены в список по смысловой близости к загаданному, и каждая попытка получает своё место в этом списке.</p>
+      <p><b>1</b> — само загаданное слово, вы угадали. <b>2</b> — его ближайший сосед по смыслу. <b>8</b> — совсем рядом. <b>350</b> — тёплое направление. <b>${Math.round(n*0.8/1000)*1000}</b> — почти край словаря, дальше некуда. Всего слов ${n.toLocaleString("ru-RU")}.</p>
       <p>Близость смысловая, а не буквенная: к слову «зима» близки «мороз» и «декабрь», но не «зимбабве».</p>
       <p>Слово можно вводить в любой форме — игра сама приведёт его к начальной. Новая загадка каждый день.</p>` },
   en:{ place:"type a word", send:"Guess", puzzle:"puzzle", tag:" · hint",
     notfound:w=>`“${w}” is not in the game dictionary`, already:w=>`“${w}” already guessed`,
     empty:"Type a word", cold:"cold", win:"Got it!",
+    hello:{morning:"Good morning", day:"Good afternoon", evening:"Good evening", night:"Good night"},
     winSub:(n,h)=>`${n} ${n===1?"guess":"guesses"}${h?`, ${h} hint${h>1?"s":""}`:""}`,
     hint:"Hint", giveup:"Give up", help:"Rules", stats:n=>`solved: ${n}`,
     gaveup:w=>`The word was ${w}`, nextIn:t=>`next word in ${t}`,
-    loadDict:"English dictionary, part",
-    rules:`<p>Find the hidden word. Every word in the dictionary is ranked by how close it is in meaning to the answer, and each guess gets its place in that ranking.</p>
-      <p><b>1</b> is the hidden word itself — you win. <b>2</b> is its nearest neighbour in meaning. <b>8</b> is very close. <b>350</b> is a warm direction. <b>15000</b> is nearly the far edge of the dictionary.</p>
+    loadDict:"Unpacking the English dictionary",
+    rules:n=>`<p>Find the hidden word. Every word in the dictionary is ranked by how close it is in meaning to the answer, and each guess gets its place in that ranking.</p>
+      <p><b>1</b> is the hidden word itself — you win. <b>2</b> is its nearest neighbour in meaning. <b>8</b> is very close. <b>350</b> is a warm direction. <b>${Math.round(n*0.8/1000)*1000}</b> is nearly the far edge. The dictionary holds ${n.toLocaleString("en-GB")} words.</p>
       <p>A new word every day.</p>` }
 };
 function plural(n,a,b,c){const m=n%100,k=n%10;return m>=11&&m<=14?c:k===1?a:k>=2&&k<=4?b:c}
@@ -156,6 +164,14 @@ let D=null, lang="ru", offset=0, state=null, secret=0, ranks=null, sims=null,
     refocus=false, cacheKey=null;
 
 const $ = s=>document.querySelector(s);
+// значение может быть строкой или парой {ru,en}
+const loc = v => (v && typeof v === "object") ? (v[lang] ?? "") : (v || "");
+function greeting(){
+  const h = new Date().getHours();
+  const key = h<5 ? "night" : h<12 ? "morning" : h<18 ? "day" : h<23 ? "evening" : "night";
+  const hi = T[lang].hello[key], name = loc(CUSTOM.name);
+  return name ? `${hi}, ${name}` : hi;
+}
 const mem = {};
 const store = {
   get(k){ try{ return JSON.parse(localStorage.getItem(k)) }catch(e){ return mem[k]??null } },
@@ -166,7 +182,7 @@ const store = {
 async function unpack(parts, label){
   const bufs = [];
   for(let k=0;k<parts.length;k++){
-    await breathe(`${label} ${k+1} из ${parts.length}…`);
+    await breathe(parts.length>1 ? `${label} ${k+1} из ${parts.length}…` : label+"…");
     let r;
     try{ r = await fetch(parts[k]) }
     catch(e){ throw new Error("нет доступа к файлу "+parts[k]) }
@@ -282,7 +298,7 @@ function render(){
 
   $("#app").className = "";
   $("#app").innerHTML = `
-    ${CUSTOM.greeting&&!done?`<div class="greeting">${CUSTOM.greeting}</div>`:""}
+    ${done?"":`<div class="greeting">${greeting()}</div>`}
     ${done?winBlock():`
       <form id="f" autocomplete="off">
         <input type="text" id="g" placeholder="${t.place}" spellcheck="false" enterkeyhint="send">
@@ -316,7 +332,7 @@ function render(){
   if($("#giveBtn")) $("#giveBtn").onclick = ()=>{ state.gaveup=true; save(); render() };
   $("#helpBtn").onclick = ()=>{
     $("#helpTitle").textContent = lang==="ru"?"Как играть":"How to play";
-    $("#helpBody").innerHTML = T[lang].rules;
+    $("#helpBody").innerHTML = T[lang].rules(D[lang].words.length);
     $("#helpClose").textContent = lang==="ru"?"Понятно":"Got it";
     document.getElementById("help").showModal();
   };
@@ -342,7 +358,7 @@ function winBlock(){
     <h2>${state.won?t.win:t.gaveup(word)}</h2>
     <p>${state.won?t.winSub(state.guesses.filter(g=>!g.hint).length,state.hints):""}${
       offset===0?" · "+t.nextIn(left):""}</p>
-    ${state.won&&CUSTOM.winMessage?`<div class="personal">${CUSTOM.winMessage}</div>`:""}
+    ${state.won&&loc(CUSTOM.winMessage)?`<div class="personal">${loc(CUSTOM.winMessage)}</div>`:""}
   </div>`;
 }
 
@@ -393,9 +409,6 @@ boot().catch(e=>{
     : `Не удалось загрузить словарь.<br>
        <small style="opacity:.6">${e}</small>`;
 });
-</script>
-<script>
-if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body>
 </html>
